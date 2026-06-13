@@ -16,7 +16,7 @@
 - 系统信息：管理员可以查看系统的基本信息，包括系统名称、服务器信息、内存信息、cpu信息、软件信息等。
 - 注册登录：用户通过注册和登录后，才能使用网站。
 - 门户浏览：用户进入首页后，可以浏览场馆列表信息，包括最新、最热。
-- 热门推荐：基于协同过滤推荐算法的热门推荐。
+- 热门推荐：基于协同过滤推荐算法的热门推荐（未登录用户）。已登录用户走个性化推荐，详见 [推荐系统架构文档](recommendation-architecture.md)。
 - 用户中心：包括用户基本资料修改、用户基本信息、密码、收藏点赞等。
 - 我的预约：包括我预约的场馆的信息。
 - 意见反馈：包括用户提交意见反馈的入口页面。
@@ -105,6 +105,7 @@ com.gk.study
 │       └── ResponseCode                  // 状态码
 ├── controller         // 业务接口
 │       └── ThingController               // 业务
+│       └── RecommendationController      // 个性化推荐
 │       └── ClassificationController      // 分类
 │       └── CommentController             // 评论
 │       └── UserController                // 用户
@@ -148,6 +149,9 @@ com.gk.study
 ## 数据库设计
 
 详细的数据库设计，可见doc文件夹中的《表结构》word文件。
+
+推荐系统相关表结构（`b_record`、`b_recommend_log`、`b_recommend_feedback`）的字段说明和 DDL，
+见 [推荐系统架构文档 — 第 4 节](recommendation-architecture.md#4-数据库表结构说明)。
 
 
 ## 开发流程
@@ -317,6 +321,10 @@ com.gk.study
 在前端编写注册页面register.vue，和登录页面login.vue。
 
 ### 热门推荐功能开发流程
+
+> **注意：** 系统目前并存两套推荐机制。下文描述的是原始的 IP 协同过滤推荐（`/api/thing/recommend`），
+> 适用于未登录用户。新增的登录用户个性化推荐接口（`/recommendation/personalized`）使用多信号加权分类匹配，
+> 包含反馈闭环和管理员统计，详细设计见 [推荐系统架构文档](recommendation-architecture.md)。
 
 热门推荐功能使用的是协同过滤推荐算法。该模块分为两个步骤，分别是记录用户浏览数据，和给用户推荐物品。
 
