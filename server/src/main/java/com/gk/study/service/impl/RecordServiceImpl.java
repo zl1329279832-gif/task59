@@ -40,7 +40,8 @@ public class RecordServiceImpl implements RecordService {
 
     @Override
     public List<String> getRecordIpList() {
-        return mapper.getIpList();
+        List<String> list = mapper.getIpList();
+        return list != null ? list : new java.util.ArrayList<>();
     }
 
     @Override

@@ -7,11 +7,14 @@ import com.gk.study.entity.Recommend;
 import com.gk.study.entity.RecEntity;
 import com.gk.study.entity.Record;
 import com.gk.study.entity.Thing;
+import com.gk.study.entity.User;
 import com.gk.study.entity.UserCF;
 import com.gk.study.permission.Access;
 import com.gk.study.permission.AccessLevel;
+import com.gk.study.service.OrderService;
 import com.gk.study.service.RecordService;
 import com.gk.study.service.ThingService;
+import com.gk.study.service.UserService;
 import com.gk.study.utils.IpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -43,6 +44,12 @@ public class ThingController {
 
     @Autowired
     RecordService recordService;
+
+    @Autowired
+    OrderService orderService;
+
+    @Autowired
+    UserService userService;
 
     @Value("${File.uploadPath}")
     private String uploadPath;
@@ -82,21 +89,23 @@ public class ThingController {
 
         // 获取ip列表
         List<String> ips = recordService.getRecordIpList();
-
+        if (ips == null) {
+            ips = new ArrayList<>();
+        }
 
         List<UserCF> users = new ArrayList<>();
         for(String ip : ips){
             // 获取ip对于的物品
             List<Record> recordList = recordService.getRecordListByIp(ip);
-//            System.out.println(recordList);
+            if (recordList == null || recordList.isEmpty()) {
+                continue;
+            }
             UserCF userCF = new UserCF(ip);
             for(Record record: recordList){
                 userCF.set(record.thingId, record.score);
             }
             users.add(userCF);
         }
-
-
 
         List<Thing> thingList;
 
@@ -107,10 +116,17 @@ public class ThingController {
             Recommend recommend = new Recommend();
             String currentIp = IpUtils.getIpAddr(request);
             List<RecEntity> recommendList = recommend.recommend(currentIp, users);
-            List<Long> thingIdList = recommendList.stream().map(A -> A.thingId).collect(Collectors.toList());
+            // 去重thingId
+            Set<Long> seen = new LinkedHashSet<>();
+            List<Long> thingIdList = new ArrayList<>();
+            for (RecEntity rec : recommendList) {
+                if (seen.add(rec.thingId)) {
+                    thingIdList.add(rec.thingId);
+                }
+            }
             if(thingIdList.size() > 0){
                 thingList = service.getThingListByThingIds(thingIdList);
-                if(thingList == null || thingList.size() < 1){
+                if(thingList == null || thingList.isEmpty()){
                     // 如推荐量太少，则走默认
                     thingList = service.getDefaultThingList();
                 }
@@ -119,6 +135,26 @@ public class ThingController {
             }
         }
 
+        // 已购过滤：如果用户已登录，过滤掉已购买的资源
+        String token = request.getHeader("TOKEN");
+        if (!StringUtils.isEmpty(token)) {
+            try {
+                User user = userService.getUserByToken(token);
+                if (user != null) {
+                    List<Order> orders = orderService.getUserOrderList(user.getId(), null);
+                    if (orders != null && !orders.isEmpty()) {
+                        Set<String> purchasedIds = orders.stream()
+                                .map(Order::getThingId)
+                                .collect(Collectors.toSet());
+                        thingList = thingList.stream()
+                                .filter(t -> !purchasedIds.contains(String.valueOf(t.getId())))
+                                .collect(Collectors.toList());
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("过滤已购资源时异常", e);
+            }
+        }
 
         return new APIResponse(ResponeCode.SUCCESS, "查询成功", thingList);
     }

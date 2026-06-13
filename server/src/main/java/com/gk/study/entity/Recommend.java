@@ -44,7 +44,13 @@ public class Recommend {
      * @return
      */
     private double pearson_dis(List<RecEntity> rating1, List<RecEntity> rating2) {
+        if (rating1 == null || rating2 == null || rating1.isEmpty() || rating2.isEmpty()) {
+            return 0.0;
+        }
         int n = Math.min(rating1.size(), rating2.size());
+        if (n == 0) {
+            return 0.0;
+        }
         List<Integer> rating1ScoreCollect = rating1.stream().map(A -> A.score).collect(Collectors.toList());
         List<Integer> rating2ScoreCollect = rating2.stream().map(A -> A.score).collect(Collectors.toList());
 
@@ -63,8 +69,10 @@ public class Recommend {
     public List<RecEntity> recommend(String ip, List<UserCF> users) {
         //找到最近邻
         Map<Double, String> distances = computeNearestNeighbor(ip, users);
+        if (distances.isEmpty()) {
+            return new ArrayList<>();
+        }
         String nearest = distances.values().iterator().next();
-//        System.out.println("最近邻 -> " + nearest);
 
         //找到最近邻看过，但是我们没看过的物品，计算推荐
         UserCF neighborRatings = new UserCF();
