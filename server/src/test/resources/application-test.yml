@@ -1,0 +1,14 @@
+server:
+  port: 9100
+  servlet:
+    context-path: /api
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+File:
+  uploadPath: /tmp/upload

@@ -3,6 +3,7 @@ package com.gk.study.controller;
 import com.gk.study.common.APIResponse;
 import com.gk.study.common.ResponeCode;
 import com.gk.study.entity.*;
+import com.gk.study.entity.Record;
 import com.gk.study.permission.Access;
 import com.gk.study.permission.AccessLevel;
 import com.gk.study.service.RecordService;
