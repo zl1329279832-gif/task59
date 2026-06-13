@@ -16,7 +16,7 @@
 - 系统信息：管理员可以查看系统的基本信息，包括系统名称、服务器信息、内存信息、cpu信息、软件信息等。
 - 注册登录：用户通过注册和登录后，才能使用网站。
 - 门户浏览：用户进入首页后，可以浏览场馆列表信息，包括最新、最热。
-- 热门推荐：基于协同过滤推荐算法的热门推荐。
+- 热门推荐：支持两种推荐模式。未登录时使用基于 IP 的协同过滤推荐；登录后使用基于用户行为（收藏、心愿、订单、评论）的个性化推荐，支持"不感兴趣"反馈闭环。详见 [推荐系统架构文档](recommendation-architecture.md)。
 - 用户中心：包括用户基本资料修改、用户基本信息、密码、收藏点赞等。
 - 我的预约：包括我预约的场馆的信息。
 - 意见反馈：包括用户提交意见反馈的入口页面。
@@ -104,16 +104,21 @@ com.gk.study
 │       └── APIResponse                   // 返回体
 │       └── ResponseCode                  // 状态码
 ├── controller         // 业务接口
-│       └── ThingController               // 业务
+│       └── ThingController               // 业务（含 IP 协同过滤推荐）
+│       └── RecommendationController      // 个性化推荐（登录用户）
 │       └── ClassificationController      // 分类
 │       └── CommentController             // 评论
 │       └── UserController                // 用户
-│       └── FeedbackController            // 意见
 │       └── FeedbackController            // 意见
 │       └── AdController                  // 广告
 │       └── OrderController               // 预约
 │       └── OpLogController               // 日志
 ├── entity            // 实体类
+│       └── RecommendFeedback             // 推荐反馈（不感兴趣）
+│       └── RecommendLog                  // 推荐事件日志
+│       └── RecommendItem                 // 推荐结果（含理由和得分）
+│       └── Recommend                     // 协同过滤算法
+│       └── UserCF / RecEntity / Record   // 协同过滤数据模型
 ├── interceptor       // 拦截器
 ├── mapper            // 数据库映射
 ├── service           // 服务实现
@@ -147,7 +152,9 @@ com.gk.study
 
 ## 数据库设计
 
-详细的数据库设计，可见doc文件夹中的《表结构》word文件。
+推荐系统相关表结构（`b_record`、`b_recommend_log`、`b_recommend_feedback`）的完整 DDL 和字段说明，详见 [推荐系统架构文档 - 表结构说明](recommendation-architecture.md#7-数据库表结构说明)。
+
+新增表的建表脚本：`server/recommendation_tables.sql`
 
 
 ## 开发流程
@@ -318,6 +325,10 @@ com.gk.study
 
 ### 热门推荐功能开发流程
 
+系统中存在两套推荐机制，详细架构对比和 API 说明见 [推荐系统架构文档](recommendation-architecture.md)。
+
+#### 旧系统：IP 协同过滤（ThingController）
+
 热门推荐功能使用的是协同过滤推荐算法。该模块分为两个步骤，分别是记录用户浏览数据，和给用户推荐物品。
 
 记录用户浏览数据，采用的是ThingController的detail接口里面，将用户浏览记录保存在b_record表里。相关代码如下：
@@ -381,6 +392,21 @@ public APIResponse recommend(HttpServletRequest request){
         return new APIResponse(ResponeCode.SUCCESS, "查询成功", thingList);
     }
 ```
+
+#### 新系统：登录用户个性化推荐（RecommendationController）
+
+新系统位于 `RecommendationController.java`，为登录用户提供个性化推荐，支持反馈闭环。
+
+核心接口：
+
+| 接口 | 说明 |
+|------|------|
+| `GET /recommendation/personalized?userId=xxx&size=10` | 个性化推荐列表（含推荐理由） |
+| `POST /recommendation/notInterested` | 标记"不感兴趣" |
+| `POST /recommendation/click` | 记录点击事件 |
+| `GET /recommendation/stats` | 管理员统计（需 ADMIN 权限） |
+
+详细流程、打分公式、信号权重、冷启动策略等见 [推荐系统架构文档](recommendation-architecture.md)。
 
 ## 重要模块实现
 
