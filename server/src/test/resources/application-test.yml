@@ -1,0 +1,19 @@
+server.port: 9100
+server.servlet.context-path: /api
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+
+File:
+  uploadPath: ./upload

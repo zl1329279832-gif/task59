@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gk.study.mapper.RecommendLogMapper">
+
+    <!-- 按事件类型统计推荐日志 -->
+    <select id="getRecommendStats" resultType="java.util.Map">
+        SELECT
+            type,
+            COUNT(*) AS count
+        FROM b_recommend_log
+        GROUP BY type
+    </select>
+
+    <!-- 按类型统计数量 -->
+    <select id="countByType" resultType="int">
+        SELECT COUNT(*)
+        FROM b_recommend_log
+        WHERE type = #{type}
+    </select>
+
+</mapper>
