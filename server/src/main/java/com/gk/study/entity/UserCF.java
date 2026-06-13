@@ -17,7 +17,12 @@ public class UserCF {
     }
 
     public UserCF set(long thingId, int score) {
-        this.recEntityList.add(new RecEntity(thingId, score));
+        RecEntity existing = find(thingId);
+        if (existing != null) {
+            existing.score += score;
+        } else {
+            this.recEntityList.add(new RecEntity(thingId, score));
+        }
         return this;
     }
 

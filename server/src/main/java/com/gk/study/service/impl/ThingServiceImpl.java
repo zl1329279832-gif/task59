@@ -114,12 +114,14 @@ public class ThingServiceImpl extends ServiceImpl<ThingMapper, Thing> implements
     public List<Thing> getThingListByThingIds(List<Long> thingIdList) {
         QueryWrapper<Thing> queryWrapper = new QueryWrapper<>();
         queryWrapper.in("id", thingIdList);
+        queryWrapper.eq("status", "0");
         return mapper.selectList(queryWrapper);
     }
 
     @Override
     public List<Thing> getDefaultThingList() {
         QueryWrapper<Thing> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("status", "0");
         queryWrapper.orderByDesc("pv");
         return mapper.selectList(queryWrapper);
     }

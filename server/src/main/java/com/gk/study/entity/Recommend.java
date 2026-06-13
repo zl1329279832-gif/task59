@@ -63,8 +63,13 @@ public class Recommend {
     public List<RecEntity> recommend(String ip, List<UserCF> users) {
         //找到最近邻
         Map<Double, String> distances = computeNearestNeighbor(ip, users);
+
+        // 冷启动：没有邻居用户时返回空列表，调用方回退到默认推荐
+        if (distances.isEmpty()) {
+            return new ArrayList<>();
+        }
+
         String nearest = distances.values().iterator().next();
-//        System.out.println("最近邻 -> " + nearest);
 
         //找到最近邻看过，但是我们没看过的物品，计算推荐
         UserCF neighborRatings = new UserCF();
@@ -73,23 +78,29 @@ public class Recommend {
                 neighborRatings = user;
             }
         }
-//        System.out.println("最近邻看过的物品 -> " + neighborRatings.recEntityList);
 
         UserCF userRatings = new UserCF();
+        boolean foundCurrentUser = false;
         for (UserCF user : users) {
             if (ip.equals(user.ip)) {
                 userRatings = user;
+                foundCurrentUser = true;
             }
         }
-//        System.out.println("用户看过的物品 -> " + userRatings.recEntityList);
 
-        //根据自己和邻居的物品计算推荐的物品
-        List<RecEntity> recommendationMovies = new ArrayList<>();
+        // 当前用户（IP）不在已有用户列表中，无法进行协同过滤，返回空列表
+        if (!foundCurrentUser) {
+            return new ArrayList<>();
+        }
+
+        //根据自己和邻居的物品计算推荐的物品（按thingId去重）
+        Map<Long, RecEntity> recommendationMap = new LinkedHashMap<>();
         for (RecEntity recEntity : neighborRatings.recEntityList) {
             if (userRatings.find(recEntity.thingId) == null) {
-                recommendationMovies.add(recEntity);
+                recommendationMap.putIfAbsent(recEntity.thingId, recEntity);
             }
         }
+        List<RecEntity> recommendationMovies = new ArrayList<>(recommendationMap.values());
         Collections.sort(recommendationMovies);
         return recommendationMovies;
     }

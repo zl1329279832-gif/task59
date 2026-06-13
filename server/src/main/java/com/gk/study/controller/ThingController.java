@@ -10,6 +10,7 @@ import com.gk.study.entity.Thing;
 import com.gk.study.entity.UserCF;
 import com.gk.study.permission.Access;
 import com.gk.study.permission.AccessLevel;
+import com.gk.study.service.OrderService;
 import com.gk.study.service.RecordService;
 import com.gk.study.service.ThingService;
 import com.gk.study.utils.IpUtils;
@@ -27,9 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -43,6 +42,9 @@ public class ThingController {
 
     @Autowired
     RecordService recordService;
+
+    @Autowired
+    OrderService orderService;
 
     @Value("${File.uploadPath}")
     private String uploadPath;
@@ -80,15 +82,21 @@ public class ThingController {
     @RequestMapping(value = "/recommend", method = RequestMethod.GET)
     public APIResponse recommend(HttpServletRequest request){
 
+        String userId = request.getParameter("userId"); // 可选，用于已购过滤
+
         // 获取ip列表
         List<String> ips = recordService.getRecordIpList();
-
+        if (ips == null) {
+            ips = Collections.emptyList();
+        }
 
         List<UserCF> users = new ArrayList<>();
         for(String ip : ips){
-            // 获取ip对于的物品
+            // 获取ip对应的记录
             List<Record> recordList = recordService.getRecordListByIp(ip);
-//            System.out.println(recordList);
+            if (recordList == null || recordList.isEmpty()) {
+                continue; // 跳过空行为用户
+            }
             UserCF userCF = new UserCF(ip);
             for(Record record: recordList){
                 userCF.set(record.thingId, record.score);
@@ -96,22 +104,27 @@ public class ThingController {
             users.add(userCF);
         }
 
-
-
         List<Thing> thingList;
 
         if(users.size() <= 1){
-            // 1个用户不满足协同推荐条件
+            // 不足2个用户不满足协同推荐条件，走默认
             thingList = service.getDefaultThingList();
         }else {
             Recommend recommend = new Recommend();
             String currentIp = IpUtils.getIpAddr(request);
             List<RecEntity> recommendList = recommend.recommend(currentIp, users);
-            List<Long> thingIdList = recommendList.stream().map(A -> A.thingId).collect(Collectors.toList());
-            if(thingIdList.size() > 0){
-                thingList = service.getThingListByThingIds(thingIdList);
-                if(thingList == null || thingList.size() < 1){
-                    // 如推荐量太少，则走默认
+
+            if(recommendList != null && !recommendList.isEmpty()){
+                List<Long> thingIdList = recommendList.stream()
+                        .map(r -> r.thingId)
+                        .distinct()
+                        .collect(Collectors.toList());
+                if(!thingIdList.isEmpty()){
+                    thingList = service.getThingListByThingIds(thingIdList);
+                    if(thingList == null || thingList.isEmpty()){
+                        thingList = service.getDefaultThingList();
+                    }
+                }else {
                     thingList = service.getDefaultThingList();
                 }
             }else {
@@ -119,8 +132,36 @@ public class ThingController {
             }
         }
 
+        // 已购过滤（仅登录用户）
+        if (userId != null && !userId.isEmpty() && thingList != null) {
+            Set<String> purchasedIds = getPurchasedThingIds(userId);
+            thingList = thingList.stream()
+                    .filter(t -> !purchasedIds.contains(String.valueOf(t.getId())))
+                    .collect(Collectors.toList());
+        }
+
+        // 按 thingId 去重（防御性）
+        if (thingList != null) {
+            Set<Long> seen = new LinkedHashSet<>();
+            thingList = thingList.stream()
+                    .filter(t -> seen.add(t.getId()))
+                    .collect(Collectors.toList());
+        }
 
         return new APIResponse(ResponeCode.SUCCESS, "查询成功", thingList);
+    }
+
+    private Set<String> getPurchasedThingIds(String userId) {
+        Set<String> ids = new HashSet<>();
+        List<Order> orders = orderService.getUserOrderList(userId, null);
+        if (orders != null) {
+            for (Order o : orders) {
+                if (o.getThingId() != null) {
+                    ids.add(o.getThingId());
+                }
+            }
+        }
+        return ids;
     }
 
     @Access(level = AccessLevel.ADMIN)
